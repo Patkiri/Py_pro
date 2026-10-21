@@ -3,7 +3,7 @@ pdf_to_notebooklm.py — อัปโหลด PDF ของแต่ละว�
 ถ้า notebook ที่จำไว้ถูกลบหรือเปิดไม่ได้ จะสร้างใหม่แล้วอัปโหลดไฟล์ทั้งหมดของวิชานั้นอีกครั้ง
 
 ติดตั้ง (ครั้งเดียว):  python -m pip install playwright
-รัน:                  py "<path ของไฟล์นี้>/pdf_to_notebooklm.py"
+รัน:                  py ./pdf_to_notebooklm.py
 
 ก่อนใช้: ตั้งค่า OneDrive sync กับ Team's SharePoint และเช็ก SOURCE_DIR, CHROME_PROFILE ให้ตรงกับเครื่อง
 """
@@ -40,7 +40,7 @@ EXISTING_CHECK_SECONDS = 30   # เปิด notebook ที่จำไว้�
 VERIFY_SECONDS = 90           # รอให้ชื่อไฟล์ขึ้นในแถบแหล่งข้อมูลสูงสุดกี่วินาที
 SETTLE_QUIET_SECONDS = 8      # ต้องไม่เห็นสถานะ "กำลังอัปโหลด/ประมวลผล" ต่อเนื่องกี่วินาทีถึงถือว่าเสร็จ
 SETTLE_MAX_SECONDS = 300      # รอให้ NotebookLM ประมวลผลไฟล์ไม่เกินกี่วินาที (ต่อวิชา)
-SETTLE_BASE_SECONDS = 15      # เวลารอขั้นต่ำ = ค่านี้ + SETTLE_PER_FILE_SECONDS x จำนวนไฟล์
+SETTLE_BASE_SECONDS = 6      # เวลารอขั้นต่ำ = ค่านี้ + SETTLE_PER_FILE_SECONDS x จำนวนไฟล์
 SETTLE_PER_FILE_SECONDS = 6
 
 ADD_SOURCE_BTN = re.compile(r"เพิ่มแหล่งข้อมูล|Add source", re.I)
