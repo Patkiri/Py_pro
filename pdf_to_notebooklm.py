@@ -18,7 +18,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright, Error as PWError, TimeoutError as PWTimeout
 
 # ================= ตั้งค่า =================
-SOURCE_DIR = r"D:\OneDrive_RMUTT\Study_Source\PDF\Rajamangala University of Technology Thanyaburi"  # โฟลเดอร์แม่ ข้างในคือโฟลเดอร์ย่อยแยกตามวิชา
+SOURCE_DIR = r""  # โฟลเดอร์แม่ ข้างในคือโฟลเดอร์ย่อยแยกตามวิชา
 
 # False = เช็กจากไฟล์ในเครื่องก่อน เข้าเว็บเฉพาะวิชาที่มีไฟล์ใหม่
 #         (ไม่มีอะไรใหม่ = ไม่เปิด Chrome เลย เร็ว)
