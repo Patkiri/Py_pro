@@ -9,9 +9,7 @@ pdf_to_notebooklm.py — อัปโหลด PDF ของแต่ละว�
 """
 
 import json
-import os
 import re
-import shutil
 import socket
 import subprocess
 import time
@@ -57,11 +55,6 @@ DEBUG_SHOT = BASE_DIR / "debug_upload.png"  # ภาพหน้าจอเก�
 # ---------- บันทึกสถานะ ----------
 
 def load_record() -> dict:
-    # ย้ายไฟล์สถานะรุ่นเก่า (ที่เคยถูกสร้างตามโฟลเดอร์ที่รันสคริปต์) มาไว้ข้างสคริปต์ ถ้ายังไม่มี
-    legacy = Path.cwd() / "notebooks.json"
-    if not RECORD_FILE.exists() and legacy.exists() and legacy.resolve() != RECORD_FILE.resolve():
-        shutil.copy2(legacy, RECORD_FILE)
-        print(f"ย้ายไฟล์สถานะเดิมจาก {legacy} มาไว้ข้างสคริปต์แล้ว")
     try:
         data = json.loads(RECORD_FILE.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
@@ -123,9 +116,9 @@ def ensure_chrome():
         CHROME_PATH,
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+        str(Path.home() / "AppData" / "Local" / "Google" / "Chrome" / "Application" / "chrome.exe"),
     ]
-    exe = next((c for c in candidates if c and os.path.exists(c)), None)
+    exe = next((c for c in candidates if c and Path(c).exists()), None)
     if not exe:
         raise SystemExit("ไม่พบ chrome.exe — ใส่ path ที่ตัวแปร CHROME_PATH")
     subprocess.Popen(
