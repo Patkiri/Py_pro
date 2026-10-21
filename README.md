@@ -9,3 +9,5 @@
 note*
 Google ,Notebooklm
 only
+
+python 3.14 >=
