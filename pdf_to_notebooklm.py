@@ -1,18 +1,11 @@
 """
-******* README: pdf_to_notebooklm.py *******
-สคริปต์นี้ช่วยอัปโหลดไฟล์ PDF ของแต่ละวิชาไปยัง NotebookLM ของ Google
+pdf_to_notebooklm.py — อัปโหลด PDF ของแต่ละวิชา (โฟลเดอร์ย่อย) ไปยัง NotebookLM วิชาละ 1 notebook
 ถ้า notebook ที่จำไว้ถูกลบหรือเปิดไม่ได้ จะสร้างใหม่แล้วอัปโหลดไฟล์ทั้งหมดของวิชานั้นอีกครั้ง
 
-ติดตั้ง (ครั้งเดียว):
-    python -m pip install playwright
+ติดตั้ง (ครั้งเดียว):  python -m pip install playwright
+รัน:                  py "<path ของไฟล์นี้>/pdf_to_notebooklm.py"
 
-รัน:
-     py "<path ของไฟล์นี้>/pdf_to_notebooklm.py"
-
-note*
-1: setup One Drive sync กับ Team's share point
-2: เช็กตั้งค่า SOURCE_DIR, CHROME_PROFILE ให้ตรงกับเครื่องคุณ
-     
+ก่อนใช้: ตั้งค่า OneDrive sync กับ Team's SharePoint และเช็ก SOURCE_DIR, CHROME_PROFILE ให้ตรงกับเครื่อง
 """
 
 import json
@@ -36,7 +29,6 @@ SOURCE_DIR = r"D:\OneDrive_RMUTT\Study_Source\PDF\Rajamangala University of Tech
 VERIFY_NOTEBOOKS = False
 
 BASE_DIR = Path(__file__).resolve().parent  # โฟลเดอร์ของสคริปต์นี้ (ไฟล์สถานะเก็บที่นี่ ไม่ขึ้นกับว่ารันจากโฟลเดอร์ไหน)
-WORK_DIR = BASE_DIR / "prepared"           # ที่เก็บไฟล์ที่เตรียมไว้ก่อนอัปโหลด (แยกโฟลเดอร์ตามวิชา)
 RECORD_FILE = BASE_DIR / "notebooks.json"  # จำ notebook ของแต่ละวิชา + ไฟล์ที่อัปโหลดแล้ว
 
 HOME_URL = "https://notebook.google.com/"
@@ -99,30 +91,21 @@ def discover_subjects(root: Path) -> dict[str, list[Path]]:
     return subjects
 
 
-def unique_name(path: Path, used: set[str]) -> str:
-    """ชื่อไฟล์ไม่ซ้ำกันในวิชาเดียวกัน ถ้าซ้ำให้เติมชื่อโฟลเดอร์แม่นำหน้า"""
-    name = path.name
-    if name in used:
-        name = f"{path.parent.name}_{path.name}"
-    used.add(name)
-    return name
-
-
-def prepare_subject(subject: str, pdfs: list[Path]) -> list[Path]:
-    out_dir = WORK_DIR / subject
-    out_dir.mkdir(parents=True, exist_ok=True)
-    result: list[Path] = []
-    used: set[str] = set()
+def prepare_subject(pdfs: list[Path]) -> list[Path]:
+    """ไฟล์ที่จะอัปโหลดของวิชานั้น (ไฟล์ต้นฉบับ) ชื่อซ้ำกันในวิชาเดียวกัน = ข้ามตัวหลังและเตือน"""
+    by_name: dict[str, Path] = {}
     for pdf in pdfs:
-        dest = out_dir / unique_name(pdf, used)
-        if not dest.exists():
-            try:
-                shutil.copy2(pdf, dest)  # ไฟล์ที่ยังเป็นไอคอนคลาวด์จะถูกโหลดลงมาตอนนี้
-            except OSError as e:
-                print(f"  ✗ คัดลอกไม่ได้ {pdf.name}: {e}")
-                continue
-        result.append(dest)
-    return result
+        if pdf.name in by_name:
+            print(f"  ⚠ ข้ามไฟล์ชื่อซ้ำ: {pdf}")
+        else:
+            by_name[pdf.name] = pdf
+    return list(by_name.values())
+
+
+def new_files(entry: dict, files: list[Path]) -> list[Path]:
+    """ไฟล์ที่ยังไม่เคยอัปโหลดตามที่บันทึกไว้ใน entry ของวิชานั้น"""
+    done = set(entry.get("uploaded", []))
+    return [f for f in files if f.name not in done]
 
 
 # ---------- ส่วนที่ 2: เปิด/เชื่อมต่อ Chrome ----------
@@ -198,12 +181,13 @@ def notebook_ready(page) -> bool:
 
 
 def wait_until(page, ready_fn, what: str):
-    """รอจน ready_fn() จริง ถ้าถูกพาไปหน้าล็อกอิน Google จะรอให้ล็อกอินในหน้าต่างนั้น"""
+    """รอจน ready_fn() จริง แล้วคืนค่านั้น ถ้าถูกพาไปหน้าล็อกอิน Google จะรอให้ล็อกอินในหน้าต่างนั้น"""
     warned = False
     deadline = time.time() + LOGIN_WAIT_SECONDS
     while time.time() < deadline:
-        if ready_fn():
-            return
+        result = ready_fn()
+        if result:
+            return result
         if "accounts.google.com" in page.url and not warned:
             print(f"⏳ ต้องล็อกอิน Google — ล็อกอินในหน้าต่าง Chrome (รอสูงสุด {LOGIN_WAIT_SECONDS} วินาที)")
             warned = True
@@ -236,8 +220,7 @@ def create_notebook(ctx, subject: str):
     """สร้าง notebook ใหม่ แล้วคืน (page, url) — ชื่อ notebook NotebookLM ตั้งให้เอง"""
     page = ctx.new_page()
     page.goto(HOME_URL)
-    wait_until(page, lambda: find_new_notebook_button(page) is not None, "ปุ่มสร้าง notebook ใหม่")
-    find_new_notebook_button(page).click()
+    wait_until(page, lambda: find_new_notebook_button(page), "ปุ่มสร้าง notebook ใหม่").click()
     page.wait_for_url(NOTEBOOK_URL_RE, timeout=60_000)
     page.wait_for_timeout(2500)
     # ไม่ตั้งชื่อเอง: NotebookLM จะตั้งชื่อให้อัตโนมัติหลังอัปโหลดแหล่งข้อมูล
@@ -330,11 +313,10 @@ def main():
     prepared: dict[str, list[Path]] = {}
     has_new = False
     for subject, pdfs in subjects.items():
-        files = prepare_subject(subject, pdfs)
+        files = prepare_subject(pdfs)
         prepared[subject] = files
         entry = record.get(subject, {})
-        done = set(entry.get("uploaded", []))
-        new = [f for f in files if f.name not in done]
+        new = new_files(entry, files)
         no_notebook = not entry.get("url")
         print(f"[{subject}] PDF {len(files)} | อัปโหลดแล้ว {len(files) - len(new)} | ใหม่ {len(new)}"
               + (" | ยังไม่มี notebook" if no_notebook else ""))
@@ -360,9 +342,7 @@ def main():
 
                 # 1) ถ้ามี notebook ที่จำไว้ ตรวจว่ายังเปิดได้จริงหรือถูกลบไปแล้ว
                 if entry.get("url"):
-                    done = set(entry.get("uploaded", []))
-                    has_new_files = any(f.name not in done for f in files)
-                    if VERIFY_NOTEBOOKS or has_new_files:
+                    if VERIFY_NOTEBOOKS or new_files(entry, files):
                         page = open_existing_notebook(ctx, entry["url"])
                         if page is None:
                             print("  ⚠ notebook เดิมหาไม่เจอ/ถูกลบ → สร้างใหม่ แล้วอัปโหลดไฟล์ทั้งหมดอีกครั้ง")
@@ -370,7 +350,7 @@ def main():
                             entry["uploaded"] = []
                             save_record(record)
 
-                new = [f for f in files if f.name not in set(entry.get("uploaded", []))]
+                new = new_files(entry, files)
                 if entry.get("url") and not new:
                     print("  ไม่มีไฟล์ใหม่")
                     continue
@@ -379,7 +359,6 @@ def main():
                 if not entry.get("url"):
                     page, url = create_notebook(ctx, subject)
                     entry["url"] = url
-                    entry["uploaded"] = []
                     save_record(record)  # จำ notebook ไว้ทันที กันสร้างซ้ำถ้าอัปโหลดพลาด
                     new = list(files)
 
